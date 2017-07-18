@@ -16,3 +16,4 @@ float getEta( float eta, float ht, bool extrPtRel = false );
 bool passIsolatedFO( int id, float eta, float disc, float pt );
 float mvacut( float A, float B, float C, float pt_ );
 void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_met, float& weight);
+void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt_met, float& evt_mt, float& weight );

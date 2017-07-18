@@ -20,14 +20,26 @@ echo 'which root'
 which root
 
 hadd -f fakerate_data.root $1/fakerate_2016*.root
-hadd -f fakerate_data_mu.root $1/fakerate_2016doublemuon*.root
-hadd -f fakerate_data_el.root $1/fakerate_2016doublee*.root
-#hadd -f fakerate_data_mu.root $1/fakerate_2016*Mu*.root
 hadd -f fakerate_wj.root $1/fakerate_WJ*.root
 hadd -f fakerate_dy.root $1/fakerate_DY*.root
-hadd -f fakerate_qcd_el.root $1/fakerate_QCD_EM*.root
-hadd -f fakerate_qcd_mu.root $1/fakerate_QCD_Mu*.root
-hadd -f fakerate_ttbar.root $1/fakerate_TTbar*.root
+hadd -f fakerate_qcd_el.root $1/fakerate_QCD_EM*.root $1/fakerate_QCD_bcToE*.root
+hadd -f fakerate_qcd_mu.root $1/fakerate_QCD_Mu_Enriched_?.root $1/fakerate_QCD_Mu_Enriched_??.root
+hadd -f fakerate_qcd_mu_incl.root $1/fakerate_QCD_Mu_Enriched_incl*
+hadd -f fakerate_ttbar.root $1/fakerate_TTbar_*.root
+hadd -f fakerate_ttbarfake.root $1/fakerate_TTbarFake*.root
+#if [[ "$1" == *v15* ]]; then
+#    :
+#else
+#    hadd -f fakerate_data.root $1/fakerate_2016*.root
+#    hadd -f fakerate_data_mu.root $1/fakerate_2016doublemuon*.root
+#    hadd -f fakerate_data_el.root $1/fakerate_2016doublee*.root
+#    #hadd -f fakerate_data_mu.root $1/fakerate_2016*Mu*.root
+#    hadd -f fakerate_wj.root $1/fakerate_WJ*.root
+#    hadd -f fakerate_dy.root $1/fakerate_DY*.root
+#    hadd -f fakerate_qcd_el.root $1/fakerate_QCD_EM*.root
+#    hadd -f fakerate_qcd_mu.root $1/fakerate_QCD_Mu*.root
+#    hadd -f fakerate_ttbar.root $1/fakerate_TTbar*.root
+#fi
 
 mkdir -p outputs/
 mv *.root outputs/
