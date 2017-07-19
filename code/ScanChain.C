@@ -680,6 +680,7 @@ void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_m
     
     if ( abs( id() ) == 11 )
     {
+        hists.fill( nvtx(), "histo_nvtx_" + suffix + "_el", weight, 50, 0, 50 );
         hists.fill( evt_mt, "histo_mt_" + suffix + "_el", weight, 20, 0, 200 );
         hists.fill( evt_met, "histo_met_" + suffix + "_el", weight, 20, 0, 200 );
         hists.fill( p4().pt(), "histo_ptvarbin_" + suffix + "_el", weight, nptbins, ptbins );
@@ -696,6 +697,7 @@ void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_m
     }
     else if ( abs( id() ) == 13 )
     {
+        hists.fill( nvtx(), "histo_nvtx_" + suffix + "_mu", weight, 50, 0, 50 );
         hists.fill( evt_mt, "histo_mt_" + suffix + "_mu", weight, 20, 0, 200 );
         hists.fill( evt_met, "histo_met_" + suffix + "_mu", weight, 20, 0, 200 );
         hists.fill( p4().pt(), "histo_ptvarbin_" + suffix + "_mu", weight, nptbins, ptbins );
@@ -791,10 +793,13 @@ void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_m
             hists.fill( evt_met, "histo_pt70_met_" + suffix + "_mu", weight, 20, 0, 200 );
         }
     }
+
+
+
 }
 
 //________________________________________________________________________________________
-void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt_met, float& evt_mt, float& weight)
+void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt_met, float& evt_mt, float& weight )
 {
     //mt control region
     if ( evt_met > 30. && evt_mt > 80. && evt_mt < 120. )
@@ -833,11 +838,50 @@ void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt
     if ( p4().pt() > 50 )
         fill( hists, label + "highpt50", evt_mt, evt_met, weight );
         
+    if ( p4().pt() > 30. &&  p4().pt() <= 50 )
+        fill( hists, label + "medpt", evt_mt, evt_met, weight );
+        
     if ( evt_mt < 20. )
         fill( hists, label + "lmt", evt_mt, evt_met, weight );
         
     if ( evt_mt > 30. )
         fill( hists, label + "hmt", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 50. )
+        fill( hists, label + "hmt50", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 70. )
+        fill( hists, label + "hmt70", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 80. )
+        fill( hists, label + "hmt80", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 120. )
+        fill( hists, label + "hmt120", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 50. && p4().pt() > 30. )
+        fill( hists, label + "hmt50pt30", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 70. && p4().pt() > 30. )
+        fill( hists, label + "hmt70pt30", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 80. && p4().pt() > 30. )
+        fill( hists, label + "hmt80pt30", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 120. && p4().pt() > 30. )
+        fill( hists, label + "hmt120pt30", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 50. && p4().pt() > 50. )
+        fill( hists, label + "hmt50pt50", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 70. && p4().pt() > 50. )
+        fill( hists, label + "hmt70pt50", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 80. && p4().pt() > 50. )
+        fill( hists, label + "hmt80pt50", evt_mt, evt_met, weight );
+        
+    if ( evt_mt > 120. && p4().pt() > 50. )
+        fill( hists, label + "hmt120pt50", evt_mt, evt_met, weight );
         
     if ( evt_mt < 20. && evt_met < 20 )
         fill( hists, label + "meas", evt_mt, evt_met, weight );

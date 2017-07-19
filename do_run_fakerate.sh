@@ -43,7 +43,7 @@ else
     ls -l
     echo 'gfal-copy'
     INFILE=$2
-    OUTDIR=condor/fakerate_sandbox_v1
+    OUTDIR=condor/fakerate_sandbox_v4
     OUTFILE=${OUTDIR}/${INFILE}
     HADOOPDIR=/hadoop/cms/store/user/phchang/
     echo gfal-copy -p -f -t 4200 --verbose file://\`pwd\`/${INFILE} gsiftp://gftp.t2.ucsd.edu/${HADOOPDIR}/${OUTFILE} --checksum ADLER32
