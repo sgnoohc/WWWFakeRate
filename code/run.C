@@ -3,7 +3,7 @@ void run(TString input_path, TString output_path)
     TString fakeratedir = gSystem->Getenv("FAKERATEDIR");
     gSystem->Load(fakeratedir + "/code/CMS3_CORE.so");
 //    gROOT->ProcessLine(".L vtx_reweight.h");
-    gROOT->ProcessLine(".L "+fakeratedir+"/code/ScanChain.C+");
+    gROOT->ProcessLine(".L "+fakeratedir+"/code/ScanChain.C++O");
     gROOT->ProcessLine("TString input_path = \""+input_path+"\";");
     gROOT->ProcessLine("TString output_path = \""+output_path+"\";");
     gROOT->ProcessLine("TString ttreename = \"t\";");
