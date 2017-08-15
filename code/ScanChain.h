@@ -13,7 +13,14 @@ using namespace LeptonTreeNamespace;
 
 struct Lepton
 {
+    int evt_event;
+    int evt_lumiBlock;
+    int evt_run;
+    int nvtx;
+    float instantLumi;
     LV p4;
+    int id;
+    int nFOs_VVV;
     int njets40;
     int prescale;
     bool pass_trig;
@@ -24,11 +31,22 @@ struct Lepton
     bool passId;
     bool passFO;
     float coneptcorr;
+    bool pass_e8i;
+    bool pass_m8i;
+    bool pass_e17i;
+    bool pass_m17i;
+    int motherID;
+    bool isEWK;
+    bool isData;
+    bool isDoubleMuon;
 
     void print()
     {
+        std::cout << "evt_event;  " << evt_event  << std::endl;
         std::cout << "p4.pt();    " << p4.pt()    << std::endl;
         std::cout << "p4.eta();   " << p4.eta()   << std::endl;
+        std::cout << "id;         " << id         << std::endl;
+        std::cout << "nFOs_VVV;   " << nFOs_VVV   << std::endl;
         std::cout << "njets40;    " << njets40    << std::endl;
         std::cout << "prescale;   " << prescale   << std::endl;
         std::cout << "pass_trig;  " << pass_trig  << std::endl;
@@ -50,6 +68,8 @@ bool passIsolatedFO( int id, float eta, float disc, float pt );
 float mvacut( float A, float B, float C, float pt_ );
 void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_met, float& weight);
 void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt_met, float& evt_mt, float& weight );
-void fillEventLevelHistograms( Lepton& lepton );
+void fillEventLevelHistograms( std::vector<Lepton>& leptons, TasUtil::AutoHist& hists );
 
+double nvtxRewgtMu( int nvtx );
+double nvtxRewgtEl( int nvtx );
 double nvtxRewgt( int nvtx );

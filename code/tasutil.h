@@ -266,6 +266,7 @@ namespace TasUtil
     template <class TREECLASS>
     class Looper
     {
+        public:
         // Members
         TChain* tchain;
         TObjArray *listOfFiles;
@@ -282,7 +283,6 @@ namespace TasUtil
         TStopwatch my_timer;
         int bar_id;
         int print_rate;
-        public:
         // Functions
         Looper(TChain* chain=0, TREECLASS* treeclass=0, int nEventsToProcess=-1);
         ~Looper();
@@ -541,7 +541,8 @@ bool TasUtil::Looper<TREECLASS>::nextTree()
         // If there is already a TFile opened from previous iteration, close it.
         if (tfile) tfile->Close();
         // Open up a new file
-        tfile = new TFile(chainelement->GetTitle());
+        //tfile = new TFile(chainelement->GetTitle());
+        tfile = TFile::Open(chainelement->GetTitle());
         // Get the ttree
         ttree = (TTree*) tfile->Get(tchain->GetName());
         if (!ttree)

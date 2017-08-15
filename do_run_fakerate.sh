@@ -42,20 +42,69 @@ fi
 echo 'which root'
 which root
 
+INPUTFILES=$1
+OUTPUTFILE=$2
+
 if [ "x${_CONDOR_SLOT}" == "x" ]; then
     :
 else
     tar xvzf condor_package.tgz
+    if [[ "${HOSTNAME}" == *uaf* ]]; then
+        :
+    else
+        ALLFILES=$(echo $1 | tr ',' ' ')
+        ALLBASENAMEFILES=""
+        for FILE in ${ALLFILES}; do
+            gfal-copy -p -f -t 4200 gsiftp://gftp.t2.ucsd.edu/$FILE ./ --checksum ADLER32
+            if [ $? -eq 0 ]; then
+                :
+            else
+                echo "failed the first time, trying again."
+                sleep 10
+                gfal-copy -p -f -t 4200 gsiftp://gftp.t2.ucsd.edu/$FILE ./ --checksum ADLER32
+                if [ $? -eq 0 ]; then
+                    :
+                else
+                    echo "failed the second time, trying again. Third time's a charm?"
+                    sleep 30
+                    gfal-copy -p -f -t 4200 gsiftp://gftp.t2.ucsd.edu/$FILE ./ --checksum ADLER32
+                    if [ $? -eq 0 ]; then
+                        :
+                    else
+                        echo "failed the third time, trying one last time. Fourth time better fucking work."
+                        sleep 60
+                        gfal-copy -p -f -t 4200 gsiftp://gftp.t2.ucsd.edu/$FILE ./ --checksum ADLER32
+                        if [ $? -eq 0 ]; then
+                            :
+                        else
+                            echo "failed the fourth time, fuck this shit. exiting!"
+                            hostname
+                            uname -a
+                            date
+                            whoami
+                            pwd
+                            echo "Job Failed on getting input files"
+                            exit
+                        fi
+                    fi
+                fi
+            fi
+            ALLBASENAMEFILES="${ALLBASENAMEFILES} $(basename $FILE)"
+            echo 'LS-ing after one gfal-copy'
+            ls -l
+        done
+        INPUTFILES=$(echo ${ALLBASENAMEFILES} | tr ' ' ',')
+    fi
 fi
 
 if [[ "$DEBUG" == true ]]; then
-    gdb --args root.exe -l -b -q $FAKERATEDIR'/code/run.C("'$1'","'$2'")'
+    gdb --args root.exe -l -b -q $FAKERATEDIR'/code/run.C("'${INPUTFILES}'","'${OUTPUTFILE}'")'
 #    igprof -pp -d -z -o igprof.pp.gz root.exe -l -b -q $FAKERATEDIR'/code/run.C("'$1'","'$2'")'
 #    igprof-analyse --sqlite -d -v -g igprof.pp.gz | sqlite3 igprof.pp.sql3 >& /dev/null
 #    cp igprof.pp.sql3 ~/public_html/cgi-bin/data/
 #    echo "http://${HOSTNAME}/~phchang/cgi-bin/igprof-navigator.py/igprof.pp/"
 else
-    root -l -b -q $FAKERATEDIR'/code/run.C("'$1'","'$2'")'
+    root -l -b -q $FAKERATEDIR'/code/run.C("'${INPUTFILES}'","'${OUTPUTFILE}'")'
 fi
 
 if [ "x${_CONDOR_SLOT}" == "x" ]; then
@@ -65,7 +114,7 @@ else
     ls -l
     echo 'gfal-copy'
     INFILE=$2
-    OUTDIR=condor/fakerate_forCommissioningv9_v1
+    OUTDIR=condor/fakerate_finalv2
     OUTFILE=${OUTDIR}/${INFILE}
     HADOOPDIR=/hadoop/cms/store/user/phchang/
     echo gfal-copy -p -f -t 4200 --verbose file://\`pwd\`/${INFILE} gsiftp://gftp.t2.ucsd.edu/${HADOOPDIR}/${OUTFILE} --checksum ADLER32
