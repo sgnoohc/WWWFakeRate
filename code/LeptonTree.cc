@@ -31,6 +31,14 @@ void LeptonTree::Init(TTree *tree) {
   if (evt_corrMET_branch) evt_corrMET_branch->SetAddress(&evt_corrMET_);
   evt_corrMETPhi_branch = tree->GetBranch("evt_corrMETPhi");
   if (evt_corrMETPhi_branch) evt_corrMETPhi_branch->SetAddress(&evt_corrMETPhi_);
+  evt_corrMET_up_branch = tree->GetBranch("evt_corrMET_up");
+  if (evt_corrMET_up_branch) evt_corrMET_up_branch->SetAddress(&evt_corrMET_up_);
+  evt_corrMETPhi_up_branch = tree->GetBranch("evt_corrMETPhi_up");
+  if (evt_corrMETPhi_up_branch) evt_corrMETPhi_up_branch->SetAddress(&evt_corrMETPhi_up_);
+  evt_corrMET_dn_branch = tree->GetBranch("evt_corrMET_dn");
+  if (evt_corrMET_dn_branch) evt_corrMET_dn_branch->SetAddress(&evt_corrMET_dn_);
+  evt_corrMETPhi_dn_branch = tree->GetBranch("evt_corrMETPhi_dn");
+  if (evt_corrMETPhi_dn_branch) evt_corrMETPhi_dn_branch->SetAddress(&evt_corrMETPhi_dn_);
   evt_pfsumet_branch = tree->GetBranch("evt_pfsumet");
   if (evt_pfsumet_branch) evt_pfsumet_branch->SetAddress(&evt_pfsumet_);
   evt_pfmetSig_branch = tree->GetBranch("evt_pfmetSig");
@@ -79,6 +87,8 @@ void LeptonTree::Init(TTree *tree) {
   if (jets_area_branch) jets_area_branch->SetAddress(&jets_area_);
   jets_undoJEC_branch = tree->GetBranch("jets_undoJEC");
   if (jets_undoJEC_branch) jets_undoJEC_branch->SetAddress(&jets_undoJEC_);
+  jets_unc_branch = tree->GetBranch("jets_unc");
+  if (jets_unc_branch) jets_unc_branch->SetAddress(&jets_unc_);
   sample_branch = tree->GetBranch("sample");
   if (sample_branch) sample_branch->SetAddress(&sample_);
   nFOs_SS_branch = tree->GetBranch("nFOs_SS");
@@ -289,6 +299,8 @@ void LeptonTree::Init(TTree *tree) {
   if (HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30_branch) HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30_branch->SetAddress(&HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30_);
   HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_branch = tree->GetBranch("HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30");
   if (HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_branch) HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_branch->SetAddress(&HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_);
+  evt_wgt_vars_branch = tree->GetBranch("evt_wgt_vars");
+  if (evt_wgt_vars_branch) evt_wgt_vars_branch->SetAddress(&evt_wgt_vars_);
 
   tree->SetMakeClass(0);
 }
@@ -302,6 +314,10 @@ void LeptonTree::GetEntry(unsigned int idx) {
   evt_trackmetPhi_isLoaded = false;
   evt_corrMET_isLoaded = false;
   evt_corrMETPhi_isLoaded = false;
+  evt_corrMET_up_isLoaded = false;
+  evt_corrMETPhi_up_isLoaded = false;
+  evt_corrMET_dn_isLoaded = false;
+  evt_corrMETPhi_dn_isLoaded = false;
   evt_pfsumet_isLoaded = false;
   evt_pfmetSig_isLoaded = false;
   evt_event_isLoaded = false;
@@ -327,6 +343,7 @@ void LeptonTree::GetEntry(unsigned int idx) {
   jets_disc_isLoaded = false;
   jets_area_isLoaded = false;
   jets_undoJEC_isLoaded = false;
+  jets_unc_isLoaded = false;
   sample_isLoaded = false;
   nFOs_SS_isLoaded = false;
   nFOs_VVV_isLoaded = false;
@@ -438,6 +455,7 @@ void LeptonTree::GetEntry(unsigned int idx) {
   HLT_Ele17_CaloIdM_TrackIdM_PFJet30_isLoaded = false;
   HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30_isLoaded = false;
   HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_isLoaded = false;
+  evt_wgt_vars_isLoaded = false;
 }
 
 void LeptonTree::LoadAllBranches() {
@@ -448,6 +466,10 @@ void LeptonTree::LoadAllBranches() {
   if (evt_trackmetPhi_branch != 0) evt_trackmetPhi();
   if (evt_corrMET_branch != 0) evt_corrMET();
   if (evt_corrMETPhi_branch != 0) evt_corrMETPhi();
+  if (evt_corrMET_up_branch != 0) evt_corrMET_up();
+  if (evt_corrMETPhi_up_branch != 0) evt_corrMETPhi_up();
+  if (evt_corrMET_dn_branch != 0) evt_corrMET_dn();
+  if (evt_corrMETPhi_dn_branch != 0) evt_corrMETPhi_dn();
   if (evt_pfsumet_branch != 0) evt_pfsumet();
   if (evt_pfmetSig_branch != 0) evt_pfmetSig();
   if (evt_event_branch != 0) evt_event();
@@ -473,6 +495,7 @@ void LeptonTree::LoadAllBranches() {
   if (jets_disc_branch != 0) jets_disc();
   if (jets_area_branch != 0) jets_area();
   if (jets_undoJEC_branch != 0) jets_undoJEC();
+  if (jets_unc_branch != 0) jets_unc();
   if (sample_branch != 0) sample();
   if (nFOs_SS_branch != 0) nFOs_SS();
   if (nFOs_VVV_branch != 0) nFOs_VVV();
@@ -584,6 +607,7 @@ void LeptonTree::LoadAllBranches() {
   if (HLT_Ele17_CaloIdM_TrackIdM_PFJet30_branch != 0) HLT_Ele17_CaloIdM_TrackIdM_PFJet30();
   if (HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30_branch != 0) HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30();
   if (HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_branch != 0) HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30();
+  if (evt_wgt_vars_branch != 0) evt_wgt_vars();
 }
 
 const float &LeptonTree::evt_pfmet() {
@@ -662,6 +686,58 @@ const float &LeptonTree::evt_corrMETPhi() {
     evt_corrMETPhi_isLoaded = true;
   }
   return evt_corrMETPhi_;
+}
+
+const float &LeptonTree::evt_corrMET_up() {
+  if (not evt_corrMET_up_isLoaded) {
+    if (evt_corrMET_up_branch != 0) {
+      evt_corrMET_up_branch->GetEntry(index);
+    } else {
+      printf("branch evt_corrMET_up_branch does not exist!\n");
+      exit(1);
+    }
+    evt_corrMET_up_isLoaded = true;
+  }
+  return evt_corrMET_up_;
+}
+
+const float &LeptonTree::evt_corrMETPhi_up() {
+  if (not evt_corrMETPhi_up_isLoaded) {
+    if (evt_corrMETPhi_up_branch != 0) {
+      evt_corrMETPhi_up_branch->GetEntry(index);
+    } else {
+      printf("branch evt_corrMETPhi_up_branch does not exist!\n");
+      exit(1);
+    }
+    evt_corrMETPhi_up_isLoaded = true;
+  }
+  return evt_corrMETPhi_up_;
+}
+
+const float &LeptonTree::evt_corrMET_dn() {
+  if (not evt_corrMET_dn_isLoaded) {
+    if (evt_corrMET_dn_branch != 0) {
+      evt_corrMET_dn_branch->GetEntry(index);
+    } else {
+      printf("branch evt_corrMET_dn_branch does not exist!\n");
+      exit(1);
+    }
+    evt_corrMET_dn_isLoaded = true;
+  }
+  return evt_corrMET_dn_;
+}
+
+const float &LeptonTree::evt_corrMETPhi_dn() {
+  if (not evt_corrMETPhi_dn_isLoaded) {
+    if (evt_corrMETPhi_dn_branch != 0) {
+      evt_corrMETPhi_dn_branch->GetEntry(index);
+    } else {
+      printf("branch evt_corrMETPhi_dn_branch does not exist!\n");
+      exit(1);
+    }
+    evt_corrMETPhi_dn_isLoaded = true;
+  }
+  return evt_corrMETPhi_dn_;
 }
 
 const float &LeptonTree::evt_pfsumet() {
@@ -989,6 +1065,19 @@ const vector<float> &LeptonTree::jets_undoJEC() {
   return *jets_undoJEC_;
 }
 
+const vector<float> &LeptonTree::jets_unc() {
+  if (not jets_unc_isLoaded) {
+    if (jets_unc_branch != 0) {
+      jets_unc_branch->GetEntry(index);
+    } else {
+      printf("branch jets_unc_branch does not exist!\n");
+      exit(1);
+    }
+    jets_unc_isLoaded = true;
+  }
+  return *jets_unc_;
+}
+
 const TString &LeptonTree::sample() {
   if (not sample_isLoaded) {
     if (sample_branch != 0) {
@@ -1020,9 +1109,8 @@ const int &LeptonTree::nFOs_VVV() {
     if (nFOs_VVV_branch != 0) {
       nFOs_VVV_branch->GetEntry(index);
     } else {
-      return nFOs_SS();
-//      printf("branch nFOs_VVV_branch does not exist!\n");
-//      exit(1);
+      printf("branch nFOs_VVV_branch does not exist!\n");
+      exit(1);
     }
     nFOs_VVV_isLoaded = true;
   }
@@ -2433,6 +2521,19 @@ const int &LeptonTree::HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30() {
   return HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_;
 }
 
+const vector<float> &LeptonTree::evt_wgt_vars() {
+  if (not evt_wgt_vars_isLoaded) {
+    if (evt_wgt_vars_branch != 0) {
+      evt_wgt_vars_branch->GetEntry(index);
+    } else {
+      printf("branch evt_wgt_vars_branch does not exist!\n");
+      exit(1);
+    }
+    evt_wgt_vars_isLoaded = true;
+  }
+  return *evt_wgt_vars_;
+}
+
 
 void LeptonTree::progress( int nEventsTotal, int nEventsChain ){
   int period = 1000;
@@ -2454,7 +2555,7 @@ void LeptonTree::progress( int nEventsTotal, int nEventsChain ){
   }
 }
 
-namespace LeptonTreeNamespace {
+namespace LeptonTreeNameSpace {
 
 const float &evt_pfmet() { return lepton_tree.evt_pfmet(); }
 const float &evt_pfmetPhi() { return lepton_tree.evt_pfmetPhi(); }
@@ -2462,6 +2563,10 @@ const float &evt_trackmet() { return lepton_tree.evt_trackmet(); }
 const float &evt_trackmetPhi() { return lepton_tree.evt_trackmetPhi(); }
 const float &evt_corrMET() { return lepton_tree.evt_corrMET(); }
 const float &evt_corrMETPhi() { return lepton_tree.evt_corrMETPhi(); }
+const float &evt_corrMET_up() { return lepton_tree.evt_corrMET_up(); }
+const float &evt_corrMETPhi_up() { return lepton_tree.evt_corrMETPhi_up(); }
+const float &evt_corrMET_dn() { return lepton_tree.evt_corrMET_dn(); }
+const float &evt_corrMETPhi_dn() { return lepton_tree.evt_corrMETPhi_dn(); }
 const float &evt_pfsumet() { return lepton_tree.evt_pfsumet(); }
 const float &evt_pfmetSig() { return lepton_tree.evt_pfmetSig(); }
 const int &evt_event() { return lepton_tree.evt_event(); }
@@ -2487,6 +2592,7 @@ const vector<ROOT::Math::LorentzVector<ROOT::Math::PxPyPzE4D<float> > > &jets() 
 const vector<float> &jets_disc() { return lepton_tree.jets_disc(); }
 const vector<float> &jets_area() { return lepton_tree.jets_area(); }
 const vector<float> &jets_undoJEC() { return lepton_tree.jets_undoJEC(); }
+const vector<float> &jets_unc() { return lepton_tree.jets_unc(); }
 const TString &sample() { return lepton_tree.sample(); }
 const int &nFOs_SS() { return lepton_tree.nFOs_SS(); }
 const int &nFOs_VVV() { return lepton_tree.nFOs_VVV(); }
@@ -2598,5 +2704,6 @@ const int &HLT_Ele8_CaloIdM_TrackIdM_PFJet30() { return lepton_tree.HLT_Ele8_Cal
 const int &HLT_Ele17_CaloIdM_TrackIdM_PFJet30() { return lepton_tree.HLT_Ele17_CaloIdM_TrackIdM_PFJet30(); }
 const int &HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30() { return lepton_tree.HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30(); }
 const int &HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30() { return lepton_tree.HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30(); }
+const vector<float> &evt_wgt_vars() { return lepton_tree.evt_wgt_vars(); }
 
 }

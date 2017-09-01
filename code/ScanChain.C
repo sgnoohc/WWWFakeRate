@@ -3,8 +3,8 @@
 
 #include "ScanChain.h"
 
-int nptbins = 9;
-double ptbins[10] = {10., 15., 20., 25., 30., 35., 50., 70., 120., 170.};
+int nptbins = 4;
+double ptbins[5] = {10., 20., 30., 50., 120.};
 
 int nptbins_coarse = 6;
 double ptbins_coarse[7] = {10., 15., 20., 25., 30., 35., 70.};
@@ -45,6 +45,10 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
                 || outputname.Contains( "WW_" ) || outputname.Contains( "WZ_" ) || outputname.Contains( "ZZ_" ) );
     bool isQCD = outputname.Contains( "QCD" ) || outputname.Contains( "TTbarFake" );
     bool noMCMatch = ( isData || isEWK );
+    bool isVV = outputname.Contains( "WW_" ) || outputname.Contains( "WZ_" ) || outputname.Contains( "ZZ_" );
+    bool doSyst = true;
+    if ( isQCD )
+        doSyst = false;
 
     //------------------------------------------------------------------------------------
     // Constants in the analysis
@@ -56,6 +60,11 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
     float e17i = 604;
     float m8i = 3464;
     float m17i = 170;
+
+//    58580.9700839
+//    7911.88489799
+//    46040.4965593
+//    3139.29431998
 
     //------------------------------------------------------------------------------------
     // Histograms in the analysis
@@ -108,14 +117,23 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
         // Compute jet variables
         //----------------------
         int njets40 = 0;
+        int njets40_up = 0;
+        int njets40_dn = 0;
 
         for ( unsigned int i = 0; i < jets().size(); i++ )
         {
-            if ( ROOT::Math::VectorUtil::DeltaR( jets()[i], p4() ) < 1. )
-                continue;
-
-            if ( jets()[i].pt() > 40. && fabs( jets()[i].eta() ) < 2.4 )
-                njets40++;
+            if ( ROOT::Math::VectorUtil::DeltaR( jets()[i], p4() ) >= 1. )
+            {
+                if ( jets()[i].pt() > 40. && fabs( jets()[i].eta() ) < 2.4 )
+                    njets40++;
+                if ( ( isEWK || isData ) && !isVV && doSyst )
+                {
+                    if ( ( jets()[i].pt() * ( 1 + jets_unc()[i] ) ) > 40. && fabs( jets()[i].eta() ) < 2.4 )
+                        njets40_up++;
+                    if ( ( jets()[i].pt() * ( 1 - jets_unc()[i] ) ) > 40. && fabs( jets()[i].eta() ) < 2.4 )
+                        njets40_dn++;
+                }
+            }
         }
 
         //--------------------------
@@ -199,6 +217,22 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
         float evt_met = evt_corrMET();
         float evt_metPhi = evt_corrMETPhi();
         float evt_mt = calculateMt( p4(), evt_met, evt_metPhi );
+        float evt_met_up = -999;
+        float evt_metPhi_up = -999;
+        float evt_mt_up = -999;
+        float evt_met_dn = -999;
+        float evt_metPhi_dn = -999;
+        float evt_mt_dn = -999;
+        if ( doSyst && !isVV )
+        //if ( false )
+        {
+            evt_met_up = evt_corrMET_up();
+            evt_metPhi_up = evt_corrMETPhi_up();
+            evt_mt_up = calculateMt( p4(), evt_met_up, evt_metPhi_up );
+            evt_met_dn = evt_corrMET_dn();
+            evt_metPhi_dn = evt_corrMETPhi_dn();
+            evt_mt_dn = calculateMt( p4(), evt_met_dn, evt_metPhi_dn );
+        }
 
         //------------------------------------------------------------
         // Lepton ID selection (most important selection in fake rate)
@@ -287,14 +321,22 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
         lepton.nvtx = lepton_tree.nvtx();
         lepton.p4 = p4();
         lepton.id = id();
-        lepton.nFOs_VVV = nFOs_VVV();
+        lepton.nFOs_VVV = isQCD ? nFOs_SS() : nFOs_VVV();
         lepton.njets40 = njets40;
+        lepton.njets40_up = njets40_up;
+        lepton.njets40_dn = njets40_dn;
         lepton.prescale = prescale;
         lepton.pass_trig = pass_trig;
         lepton.weight = weight;
         lepton.evt_met = evt_met;
         lepton.evt_metPhi = evt_metPhi;
         lepton.evt_mt = evt_mt;
+        lepton.evt_met_up = evt_met_up;
+        lepton.evt_metPhi_up = evt_metPhi_up;
+        lepton.evt_mt_up = evt_mt_up;
+        lepton.evt_met_dn = evt_met_dn;
+        lepton.evt_metPhi_dn = evt_metPhi_dn;
+        lepton.evt_mt_dn = evt_mt_dn;
         lepton.passId = passId;
         lepton.passFO = passFO;
         lepton.coneptcorr = coneptcorr;
@@ -306,6 +348,11 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
         lepton.isEWK = isEWK;
         lepton.isData = isData;
         lepton.isDoubleMuon = isDoubleMuon;
+        std::vector<float> wgt_syst;
+        if ( !isQCD && doSyst )
+            for ( unsigned int i = 1; i < lepton_tree.evt_wgt_vars().size(); ++i )
+                wgt_syst.push_back( lepton_tree.evt_wgt_vars()[i] );
+        lepton.wgt_syst = wgt_syst;
 
         //-------------------------------
         // Debug print relevant variables
@@ -325,31 +372,31 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
         if ( prev_evt_event != lepton_tree.evt_event() )
         {
 
-            // If it is a new event, it means it's time to take care of previous event data
-            // Do something with it.
-            fillEventLevelHistograms( leptons, hists );
+            if ( leptons.size() > 0 )
+            {
 
-//            TH1* evt_lvl_hist = hists.get( "evt_lvl_histo_ptvarbin_meas_mu" );
-//            TH1* lep_lvl_hist = hists.get( "histo_ptvarbin_meas_mu" );
-//            if ( evt_lvl_hist && lep_lvl_hist )
-//            {
-//                evt_lvl_hist->Print( "all" );
-//                lep_lvl_hist->Print( "all" );
-//                for ( unsigned int ibin = 0; ibin < evt_lvl_hist->GetNbinsX(); ++ibin )
-//                {
-//                    double evt_val = evt_lvl_hist->GetBinContent( ibin );
-//                    double lep_val = lep_lvl_hist->GetBinContent( ibin );
-//                    if ( evt_val != lep_val )
-//                    {
-//                        for ( auto& lepton : leptons )
-//                            lepton.print();
-//                        TasUtil::error( "" );
-//                    }
-//                }
-//            }
+                // If it is a new event, it means it's time to take care of previous event data
+                // Do something with it.
+//                fillEventLevelHistograms( leptons, hists );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 0 , "" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 1 , "syst1_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 2 , "syst2_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 3 , "syst3_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 4 , "syst4_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 5 , "syst5_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 6 , "syst6_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 7 , "syst7_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 8 , "syst8_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 9 , "syst9_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 10, "syst10_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 11, "syst11_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40, leptons[0].evt_met, leptons[0].evt_metPhi, leptons[0].evt_mt, 12, "syst12_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40_up, leptons[0].evt_met_up, leptons[0].evt_metPhi_up, leptons[0].evt_mt_up, 13, "syst13_" );
+                fillEventLevelHistogramsSyst( leptons, hists, leptons[0].njets40_dn, leptons[0].evt_met_dn, leptons[0].evt_metPhi_dn, leptons[0].evt_mt_dn, 14, "syst14_" );
 
-            // After doing something with it, clear it out.
-            leptons.clear();
+                // After doing something with it, clear it out.
+                leptons.clear();
+            }
 
             prev_evt_event = lepton_tree.evt_event();
         }
@@ -378,6 +425,8 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
             std::cout << "=====" << std::endl;
 
         }
+
+        continue;
 
         //==========================================================================================
         //
@@ -560,30 +609,227 @@ void ScanChain( TChain* chain, TString outputname, int nEvents = -1 )
 
     }
 
-    TH1F* h_Nt    = ( TH1F* ) hists.get( "Nt" );
-    TH1F* h_Nl    = ( TH1F* ) hists.get( "Nl" );
-    TH1F* h_Nt_e  = ( TH1F* ) hists.get( "Nt_e" );
-    TH1F* h_Nl_e  = ( TH1F* ) hists.get( "Nl_e" );
-    TH1F* h_Nt_mu = ( TH1F* ) hists.get( "Nt_mu" );
-    TH1F* h_Nl_mu = ( TH1F* ) hists.get( "Nl_mu" );
+    TH1F* h_Nt_e  = ( TH1F* ) hists.get( "evt_lvl_histo_ptvarbin_meas_el" );
+    TH1F* h_Nl_e  = ( TH1F* ) hists.get( "evt_lvl_histo_ptvarbin_loose_meas_el" );
+    TH1F* h_Nt_mu = ( TH1F* ) hists.get( "evt_lvl_histo_ptvarbin_meas_mu" );
+    TH1F* h_Nl_mu = ( TH1F* ) hists.get( "evt_lvl_histo_ptvarbin_loose_meas_mu" );
 
-    float Nt    = h_Nt    ? h_Nt    -> GetBinContent( 1 ) : 0.;
-    float Nl    = h_Nl    ? h_Nl    -> GetBinContent( 1 ) : 0.;
+    if ( h_Nt_e  ) h_Nt_e  -> Rebin( h_Nt_e ->GetNbinsX() );
+    if ( h_Nl_e  ) h_Nl_e  -> Rebin( h_Nl_e ->GetNbinsX() );
+    if ( h_Nt_mu ) h_Nt_mu -> Rebin( h_Nt_mu->GetNbinsX() );
+    if ( h_Nl_mu ) h_Nl_mu -> Rebin( h_Nl_mu->GetNbinsX() );
+
     float Nt_e  = h_Nt_e  ? h_Nt_e  -> GetBinContent( 1 ) : 0.;
     float Nl_e  = h_Nl_e  ? h_Nl_e  -> GetBinContent( 1 ) : 0.;
     float Nt_mu = h_Nt_mu ? h_Nt_mu -> GetBinContent( 1 ) : 0.;
     float Nl_mu = h_Nl_mu ? h_Nl_mu -> GetBinContent( 1 ) : 0.;
 
-    float e = Nt / ( Nl );
     float e_e = Nt_e / ( Nl_e );
     float e_mu = Nt_mu / ( Nl_mu );
 
-    cout << "\nReco: " << "Nt = " << Nt << ", Nl = " << Nl << ", e = " << e << endl;
     cout << "\nReco (el): " << "Nt = " << Nt_e << ", Nl = " << Nl_e << ", e = " << e_e << endl;
     cout << "\nReco (mu): " << "Nt = " << Nt_mu << ", Nl = " << Nl_mu << ", e = " << e_mu <<
         endl;
 
     hists.save( outputname );
+}
+
+//________________________________________________________________________________________
+void fillEventLevelHistogramsSyst(
+        std::vector<Lepton> leptons,
+        TasUtil::AutoHist& hists,
+        int njets,
+        float evt_met,
+        float evt_metPhi,
+        float evt_mt,
+        int iwgt,
+        TString prefix
+        )
+{
+    //----------------------------------------
+    // Count number of loose and tight leptons
+    //----------------------------------------
+    int nFOs = 0;
+    int nIds = 0;
+    for ( auto& lepton : leptons )
+    {
+        if ( lepton.passFO ) nFOs++; // redundant as leptons vector already has passFO criteria
+        if ( lepton.passId ) nIds++;
+    }
+
+    //--------------------------------------------------------------------
+    // First reproduce the nominal results using this event level approach
+    //--------------------------------------------------------------------
+    if ( nFOs == 1 )
+    {
+
+        float weight = leptons[0].weight;
+
+        if ( leptons[0].wgt_syst.size() )
+        {
+//            std::cout << "before " << weight << std::endl;
+            weight /= leptons[0].wgt_syst[0];
+            weight *= leptons[0].wgt_syst[iwgt];
+//            std::cout << "after  " << weight << std::endl;
+        }
+
+        // Preselection
+        if ( leptons[0].isData &&  leptons[0].isDoubleMuon && abs( leptons[0].id ) != 13 ) return;
+        if ( leptons[0].isData && !leptons[0].isDoubleMuon && abs( leptons[0].id ) != 11 ) return;
+        if ( njets              < 1 ) return;
+        if ( leptons[0].pass_trig == false ) return;
+
+        // EWK CR no MT cut
+        if ( evt_met            > 30.          &&
+             leptons[0].passId                 &&
+             leptons[0].p4.pt() > 10.
+           )
+        {
+            if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
+                hists.fill( evt_mt           , prefix + "evt_lvl_histo_mt_cr_mu", leptons[0].weight, 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
+                hists.fill( evt_mt           , prefix + "evt_lvl_histo_mt_cr_el", leptons[0].weight, 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
+                hists.fill( evt_mt           , prefix + "evt_lvl_nvtxrewgt_histo_mt_cr_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
+                hists.fill( evt_mt           , prefix + "evt_lvl_nvtxrewgt_histo_mt_cr_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 20, 0, 200 );
+        }
+        // MR
+        if ( evt_met            < 20.          &&
+             evt_mt             < 20.          &&
+             leptons[0].p4.pt() > 10.
+           )
+        {
+            if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
+            {
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_histo_ptvarbin_loose_meas_mu", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_histo_ptvarbin_meas_mu", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_histo_conecorrptvarbin_loose_meas_mu", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_histo_conecorrptvarbin_meas_mu", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_histo_etavarbin_loose_meas_mu", leptons[0].weight, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_histo_etavarbin_meas_mu", leptons[0].weight, netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_ptvarbin_etavarbin_loose_meas_mu", leptons[0].weight, nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_ptvarbin_etavarbin_meas_mu", leptons[0].weight, nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_conecorrptvarbin_etavarbin_loose_meas_mu", leptons[0].weight, nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_conecorrptvarbin_etavarbin_meas_mu", leptons[0].weight, nptbins, ptbins, netabins, etabins_mu );
+            }
+            if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
+            {
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_histo_ptvarbin_loose_meas_el", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_histo_ptvarbin_meas_el", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_histo_conecorrptvarbin_loose_meas_el", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_histo_conecorrptvarbin_meas_el", leptons[0].weight, nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_histo_etavarbin_loose_meas_el", leptons[0].weight, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_histo_etavarbin_meas_el", leptons[0].weight, netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_ptvarbin_etavarbin_loose_meas_el", leptons[0].weight, nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_ptvarbin_etavarbin_meas_el", leptons[0].weight, nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_conecorrptvarbin_etavarbin_loose_meas_el", leptons[0].weight, nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_histo_conecorrptvarbin_etavarbin_meas_el", leptons[0].weight, nptbins, ptbins, netabins, etabins_el );
+            }
+
+            if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
+            {
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+            }
+            if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
+            {
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), prefix + "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+            }
+        }
+        // High pt lepton region
+        if ( leptons[0].p4.pt() > 50. &&
+             leptons[0].passId
+           )
+        {
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( evt_met           , prefix + "evt_lvl_histo_met_highpt50_mu", leptons[0].weight, 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( evt_met           , prefix + "evt_lvl_histo_met_highpt50_el", leptons[0].weight, 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].nvtx, prefix + "evt_lvl_histo_nvtx_highpt50_mu", leptons[0].weight, 50, 0, 50 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].nvtx, prefix + "evt_lvl_histo_nvtx_highpt50_el", leptons[0].weight, 50, 0, 50 );
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( evt_met           , prefix + "evt_lvl_nvtxrewgt_histo_met_highpt50_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( evt_met           , prefix + "evt_lvl_nvtxrewgt_histo_met_highpt50_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].nvtx, prefix + "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 50, 0, 50 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].nvtx, prefix + "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 50, 0, 50 );
+        }
+    }
+
+//    else if ( nFOs == 2 )
+//    {
+//
+//        // Compute some variables
+//        float mll = ( leptons[0].p4 + leptons[1].p4 ).mass();
+//        float mt0 = leptons[0].p4.pt() > 10. ? calculateMt( leptons[0].p4, leptons[0].evt_met, leptons[0].evt_metPhi ) : -999;
+//        float mt1 = leptons[1].p4.pt() > 10. ? calculateMt( leptons[1].p4, leptons[1].evt_met, leptons[1].evt_metPhi ) : -999;
+//        int idx_wtag = abs( mt0 - 80. ) < abs( mt1 - 80. ) ? 0 : 1;
+//        int idx_cand = abs( mt0 - 80. ) < abs( mt1 - 80. ) ? 1 : 0;
+//        int idx_lead = leptons[0].p4.pt() > leptons[1].p4.pt() ? 0 : 1;
+//        int idx_subl = leptons[0].p4.pt() > leptons[1].p4.pt() ? 1 : 0;
+//        int isSF = abs( leptons[0].id ) == abs( leptons[1].id );
+//
+//        hists.fill( mt0, "mt0" , leptons[0].weight, 50, 0, 150 );
+//        hists.fill( mt1, "mt1" , leptons[1].weight, 50, 0, 150 );
+//        hists.fill( idx_wtag ? mt1 : mt0, "mtW" , leptons[idx_wtag].weight, 50, 0, 150 );
+//        hists.fill( idx_cand ? mt1 : mt0, "mtL" , leptons[idx_cand].weight, 50, 0, 150 );
+//
+//        // Preselection
+//        bool presel = true;
+//        if (!( leptons[idx_wtag].p4.pt()          >= 25.                            )) presel = false;
+//        if (!( fabs( leptons[idx_wtag].p4.eta() ) <=  2.4                           )) presel = false;
+//        if (!( ( abs( leptons[idx_wtag].id ) == 11 && leptons[idx_wtag].pass_e17i )
+//            || ( abs( leptons[idx_wtag].id ) == 13 && leptons[idx_wtag].pass_m17i ) )) presel = false;
+//
+//        // Fill some histograms
+//        if ( presel && isSF && abs( leptons[idx_wtag].id ) == 11 ) hists.fill( mll, "nFO2_mll_e17i" , leptons[idx_wtag].weight, 50, 0, 150 );
+//        if ( presel && isSF && abs( leptons[idx_wtag].id ) == 13 ) hists.fill( mll, "nFO2_mll_m17i" , leptons[idx_wtag].weight, 50, 0, 150 );
+//        if ( presel )
+//        {
+//            hists.fill( leptons[idx_wtag].evt_met, "met_presel" , leptons[idx_wtag].weight, 40, 0, 200 );
+//            hists.fill( leptons[idx_wtag].evt_mt , "mt_presel"  , leptons[idx_wtag].weight, 40, 0, 200 );
+//        }
+//
+//        // Tagging W events
+//        bool wsel = presel;
+//        if (!( leptons[idx_wtag].evt_mt > 80.                   )) wsel = false;
+//        if (!( leptons[idx_wtag].evt_mt < 120.                  )) wsel = false;
+//        if (!( ( isSF && fabs( mll - 91.1876 ) > 15. ) || !isSF )) wsel = false;
+//        if (!( ( isSF && mll                   > 20. ) || !isSF )) wsel = false;
+//
+//        // Fill some histograms
+//        if ( wsel )
+//        {
+//            // Fill without motherID tagging
+//            hists.fill( leptons[idx_cand].p4.pt(), "evt_lvl_nFO2_histo_ptvarbin_loose_meas_mu", leptons[idx_cand].weight, nptbins, ptbins );
+//            if ( leptons[idx_cand].passId )
+//                hists.fill( leptons[idx_cand].p4.pt(), "evt_lvl_nFO2_histo_ptvarbin_meas_mu", leptons[idx_cand].weight, nptbins, ptbins );
+//
+//            // Fill with motherID tagging
+//            if ( ( leptons[idx_cand].isEWK && leptons[idx_cand].motherID > 0 ) || !leptons[idx_cand].isEWK )
+//            {
+//                hists.fill( leptons[idx_cand].p4.pt(), "evt_lvl_nFO2_wMCmatch_histo_ptvarbin_loose_meas_mu", leptons[idx_cand].weight, nptbins, ptbins );
+//                if ( leptons[idx_cand].passId )
+//                    hists.fill( leptons[idx_cand].p4.pt(), "evt_lvl_nFO2_wMCmatch_histo_ptvarbin_meas_mu", leptons[idx_cand].weight, nptbins, ptbins );
+//            }
+//        }
+//
+//    }
+
 }
 
 //________________________________________________________________________________________
@@ -622,9 +868,9 @@ void fillEventLevelHistograms( std::vector<Lepton>& leptons, TasUtil::AutoHist& 
             if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
                 hists.fill( leptons[0].evt_mt, "evt_lvl_histo_mt_cr_el", leptons[0].weight, 20, 0, 200 );
             if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
-                hists.fill( leptons[0].evt_mt, "evt_lvl_nvtxrewgt_histo_mt_cr_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), 20, 0, 200 );
+                hists.fill( leptons[0].evt_mt, "evt_lvl_nvtxrewgt_histo_mt_cr_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 20, 0, 200 );
             if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
-                hists.fill( leptons[0].evt_mt, "evt_lvl_nvtxrewgt_histo_mt_cr_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), 20, 0, 200 );
+                hists.fill( leptons[0].evt_mt, "evt_lvl_nvtxrewgt_histo_mt_cr_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 20, 0, 200 );
         }
         // MR
         if ( leptons[0].evt_met < 20.          &&
@@ -661,29 +907,29 @@ void fillEventLevelHistograms( std::vector<Lepton>& leptons, TasUtil::AutoHist& 
 
             if ( abs( leptons[0].id ) == 13 && fabs( leptons[0].p4.eta() ) < 2.4 )
             {
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), netabins, etabins_mu );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), netabins, etabins_mu );
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_mu );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_mu );
-                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_mu );
-                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), nptbins, ptbins, netabins, etabins_mu );
             }
             if ( abs( leptons[0].id ) == 11 && fabs( leptons[0].p4.eta() ) < 2.5 )
             {
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins );
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), netabins, etabins_el );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), netabins, etabins_el );
-                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_el );
-                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_el );
-                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_el );
-                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_ptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_ptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passFO ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_loose_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
+                if ( leptons[0].passId ) hists.fill( ( 1 + leptons[0].coneptcorr ) * leptons[0].p4.pt(), leptons[0].p4.eta(), "evt_lvl_nvtxrewgt_histo_conecorrptvarbin_etavarbin_meas_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), nptbins, ptbins, netabins, etabins_el );
             }
         }
         // High pt lepton region
@@ -695,10 +941,10 @@ void fillEventLevelHistograms( std::vector<Lepton>& leptons, TasUtil::AutoHist& 
             if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].evt_met, "evt_lvl_histo_met_highpt50_el", leptons[0].weight, 20, 0, 200 );
             if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].nvtx, "evt_lvl_histo_nvtx_highpt50_mu", leptons[0].weight, 50, 0, 50 );
             if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].nvtx, "evt_lvl_histo_nvtx_highpt50_el", leptons[0].weight, 50, 0, 50 );
-            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].evt_met, "evt_lvl_nvtxrewgt_histo_met_highpt50_mu", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), 20, 0, 200 );
-            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].evt_met, "evt_lvl_nvtxrewgt_histo_met_highpt50_el", leptons[0].weight * nvtxRewgtMu( leptons[0].nvtx ), 20, 0, 200 );
-            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].nvtx, "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_mu", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), 50, 0, 50 );
-            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].nvtx, "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_el", leptons[0].weight * nvtxRewgtEl( leptons[0].nvtx ), 50, 0, 50 );
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].evt_met, "evt_lvl_nvtxrewgt_histo_met_highpt50_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].evt_met, "evt_lvl_nvtxrewgt_histo_met_highpt50_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 20, 0, 200 );
+            if ( abs( leptons[0].id ) == 13 ) hists.fill( leptons[0].nvtx, "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_mu", leptons[0].weight * nvtxRewgtMu( leptons[0] ), 50, 0, 50 );
+            if ( abs( leptons[0].id ) == 11 ) hists.fill( leptons[0].nvtx, "evt_lvl_nvtxrewgt_histo_nvtx_highpt50_el", leptons[0].weight * nvtxRewgtEl( leptons[0] ), 50, 0, 50 );
         }
     }
 
@@ -1126,47 +1372,50 @@ void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt
 }
 
 //________________________________________________________________________________________
-double nvtxRewgtMu( int nvtx )
+double nvtxRewgtMu( Lepton& lepton )
 {
-    if ( nvtx == 1 ) return 12.0595;
-    if ( nvtx == 2 ) return 8.92974;
-    if ( nvtx == 3 ) return 9.18154;
-    if ( nvtx == 4 ) return 5.44869;
-    if ( nvtx == 5 ) return 3.89667;
-    if ( nvtx == 6 ) return 7.17796;
-    if ( nvtx == 7 ) return 8.54106;
-    if ( nvtx == 8 ) return 5.06104;
-    if ( nvtx == 9 ) return 3.65879;
-    if ( nvtx == 10) return 3.00747;
-    if ( nvtx == 11) return 2.24693;
-    if ( nvtx == 12) return 1.87359;
-    if ( nvtx == 13) return 1.55825;
-    if ( nvtx == 14) return 1.29995;
-    if ( nvtx == 15) return 1.09876;
-    if ( nvtx == 16) return 0.97441;
-    if ( nvtx == 17) return 0.829951;
-    if ( nvtx == 18) return 0.774742;
-    if ( nvtx == 19) return 0.690336;
-    if ( nvtx == 20) return 0.602904;
-    if ( nvtx == 21) return 0.559357;
-    if ( nvtx == 22) return 0.460413;
-    if ( nvtx == 23) return 0.413193;
-    if ( nvtx == 24) return 0.347697;
-    if ( nvtx == 25) return 0.318157;
-    if ( nvtx == 26) return 0.284326;
-    if ( nvtx == 27) return 0.24215;
-    if ( nvtx == 28) return 0.197417;
-    if ( nvtx == 29) return 0.179646;
-    if ( nvtx == 30) return 0.140347;
-    if ( nvtx == 31) return 0.146983;
-    if ( nvtx == 32) return 0.106538;
-    if ( nvtx == 33) return 0.0968753;
-    if ( nvtx == 34) return 0.109652;
-    if ( nvtx == 35) return 0.103228;
-    if ( nvtx == 36) return 0.0758201;
-    if ( nvtx == 37) return 0.100034;
-    if ( nvtx == 38) return 0.118447;
-    if ( nvtx >= 39) return 0.108058;
+    if ( lepton.isData ) return 1;
+    int nvtx = lepton.nvtx;
+    double rewgt = 0;
+    if ( nvtx == 1 ) rewgt = 12.0595;
+    if ( nvtx == 2 ) rewgt = 8.92974;
+    if ( nvtx == 3 ) rewgt = 9.18154;
+    if ( nvtx == 4 ) rewgt = 5.44869;
+    if ( nvtx == 5 ) rewgt = 3.89667;
+    if ( nvtx == 6 ) rewgt = 7.17796;
+    if ( nvtx == 7 ) rewgt = 8.54106;
+    if ( nvtx == 8 ) rewgt = 5.06104;
+    if ( nvtx == 9 ) rewgt = 3.65879;
+    if ( nvtx == 10) rewgt = 3.00747;
+    if ( nvtx == 11) rewgt = 2.24693;
+    if ( nvtx == 12) rewgt = 1.87359;
+    if ( nvtx == 13) rewgt = 1.55825;
+    if ( nvtx == 14) rewgt = 1.29995;
+    if ( nvtx == 15) rewgt = 1.09876;
+    if ( nvtx == 16) rewgt = 0.97441;
+    if ( nvtx == 17) rewgt = 0.829951;
+    if ( nvtx == 18) rewgt = 0.774742;
+    if ( nvtx == 19) rewgt = 0.690336;
+    if ( nvtx == 20) rewgt = 0.602904;
+    if ( nvtx == 21) rewgt = 0.559357;
+    if ( nvtx == 22) rewgt = 0.460413;
+    if ( nvtx == 23) rewgt = 0.413193;
+    if ( nvtx == 24) rewgt = 0.347697;
+    if ( nvtx == 25) rewgt = 0.318157;
+    if ( nvtx == 26) rewgt = 0.284326;
+    if ( nvtx == 27) rewgt = 0.24215;
+    if ( nvtx == 28) rewgt = 0.197417;
+    if ( nvtx == 29) rewgt = 0.179646;
+    if ( nvtx == 30) rewgt = 0.140347;
+    if ( nvtx == 31) rewgt = 0.146983;
+    if ( nvtx == 32) rewgt = 0.106538;
+    if ( nvtx == 33) rewgt = 0.0968753;
+    if ( nvtx == 34) rewgt = 0.109652;
+    if ( nvtx == 35) rewgt = 0.103228;
+    if ( nvtx == 36) rewgt = 0.0758201;
+    if ( nvtx == 37) rewgt = 0.100034;
+    if ( nvtx == 38) rewgt = 0.118447;
+    if ( nvtx >= 39) rewgt = 0.108058;
 //    if ( nvtx == 39) return 0.224361;
 //    if ( nvtx == 40) return 0.153384;
 //    if ( nvtx == 41) return 0.08641;
@@ -1178,46 +1427,49 @@ double nvtxRewgtMu( int nvtx )
 //    if ( nvtx == 47) return 1.76097;
 //    if ( nvtx == 48) return 10.5195;
 //    if ( nvtx == 49) return 0;
-    return 0;
+    return rewgt / 1.08601;
 }
 
 //________________________________________________________________________________________
-double nvtxRewgtEl( int nvtx )
+double nvtxRewgtEl( Lepton& lepton )
 {
-    if (nvtx == 1 ) return 6.88505;
-    if (nvtx == 2 ) return 4.70385;
-    if (nvtx == 3 ) return 7.32598;
-    if (nvtx == 4 ) return 4.72944;
-    if (nvtx == 5 ) return 3.85838;
-    if (nvtx == 6 ) return 7.61054;
-    if (nvtx == 7 ) return 8.87676;
-    if (nvtx == 8 ) return 6.01298;
-    if (nvtx == 9 ) return 4.49724;
-    if (nvtx == 10) return 3.7141;
-    if (nvtx == 11) return 2.94349;
-    if (nvtx == 12) return 2.43554;
-    if (nvtx == 13) return 2.08074;
-    if (nvtx == 14) return 1.69239;
-    if (nvtx == 15) return 1.50527;
-    if (nvtx == 16) return 1.24766;
-    if (nvtx == 17) return 1.09752;
-    if (nvtx == 18) return 1.02464;
-    if (nvtx == 19) return 0.847891;
-    if (nvtx == 20) return 0.748406;
-    if (nvtx == 21) return 0.644106;
-    if (nvtx == 22) return 0.568709;
-    if (nvtx == 23) return 0.510288;
-    if (nvtx == 24) return 0.437237;
-    if (nvtx == 25) return 0.354571;
-    if (nvtx == 26) return 0.316947;
-    if (nvtx == 27) return 0.224743;
-    if (nvtx == 28) return 0.267746;
-    if (nvtx == 29) return 0.205743;
-    if (nvtx == 30) return 0.160799;
-    if (nvtx == 31) return 0.161664;
-    if (nvtx == 32) return 0.145897;
-    if (nvtx == 33) return 0.147893;
-    if (nvtx >= 34) return 0.099029;
+    if ( lepton.isData ) return 1;
+    int nvtx = lepton.nvtx;
+    double rewgt = 0;
+    if (nvtx == 1 ) rewgt = 6.88505;
+    if (nvtx == 2 ) rewgt = 4.70385;
+    if (nvtx == 3 ) rewgt = 7.32598;
+    if (nvtx == 4 ) rewgt = 4.72944;
+    if (nvtx == 5 ) rewgt = 3.85838;
+    if (nvtx == 6 ) rewgt = 7.61054;
+    if (nvtx == 7 ) rewgt = 8.87676;
+    if (nvtx == 8 ) rewgt = 6.01298;
+    if (nvtx == 9 ) rewgt = 4.49724;
+    if (nvtx == 10) rewgt = 3.7141;
+    if (nvtx == 11) rewgt = 2.94349;
+    if (nvtx == 12) rewgt = 2.43554;
+    if (nvtx == 13) rewgt = 2.08074;
+    if (nvtx == 14) rewgt = 1.69239;
+    if (nvtx == 15) rewgt = 1.50527;
+    if (nvtx == 16) rewgt = 1.24766;
+    if (nvtx == 17) rewgt = 1.09752;
+    if (nvtx == 18) rewgt = 1.02464;
+    if (nvtx == 19) rewgt = 0.847891;
+    if (nvtx == 20) rewgt = 0.748406;
+    if (nvtx == 21) rewgt = 0.644106;
+    if (nvtx == 22) rewgt = 0.568709;
+    if (nvtx == 23) rewgt = 0.510288;
+    if (nvtx == 24) rewgt = 0.437237;
+    if (nvtx == 25) rewgt = 0.354571;
+    if (nvtx == 26) rewgt = 0.316947;
+    if (nvtx == 27) rewgt = 0.224743;
+    if (nvtx == 28) rewgt = 0.267746;
+    if (nvtx == 29) rewgt = 0.205743;
+    if (nvtx == 30) rewgt = 0.160799;
+    if (nvtx == 31) rewgt = 0.161664;
+    if (nvtx == 32) rewgt = 0.145897;
+    if (nvtx == 33) rewgt = 0.147893;
+    if (nvtx >= 34) rewgt = 0.099029;
 //    if (nvtx == 35) return 0.137373;
 //    if (nvtx == 36) return 0.109028;
 //    if (nvtx == 37) return 0.091604;
@@ -1234,7 +1486,7 @@ double nvtxRewgtEl( int nvtx )
 //    if (nvtx == 48) return 0;
 //    if (nvtx == 49) return 24.4347;
 //    if (nvtx == 50) return 0;
-    return 0;
+    return rewgt / 1.38452;
 }
 
 

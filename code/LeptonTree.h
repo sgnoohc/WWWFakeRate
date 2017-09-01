@@ -1,6 +1,6 @@
 // -*- C++ -*-
 // This is a header file generated with the command:
-// makeCMS3ClassFiles("/hadoop/cms/store/user/phchang/condor/forCommissioningv9/2016DoubleMuon_1.root", "t", "LeptonTree", "tas", "lepton_tree")
+// makeCMS3ClassFiles("/hadoop/cms/store/user/phchang/condor/forCommissioningv11/TTbar_1.root", "t", "LeptonTree", "LeptonTreeNameSpace", "lepton_tree")
 
 #ifndef LeptonTree_H
 #define LeptonTree_H
@@ -40,6 +40,18 @@ class LeptonTree {
   float    evt_corrMETPhi_;
   TBranch *evt_corrMETPhi_branch;
   bool     evt_corrMETPhi_isLoaded;
+  float    evt_corrMET_up_;
+  TBranch *evt_corrMET_up_branch;
+  bool     evt_corrMET_up_isLoaded;
+  float    evt_corrMETPhi_up_;
+  TBranch *evt_corrMETPhi_up_branch;
+  bool     evt_corrMETPhi_up_isLoaded;
+  float    evt_corrMET_dn_;
+  TBranch *evt_corrMET_dn_branch;
+  bool     evt_corrMET_dn_isLoaded;
+  float    evt_corrMETPhi_dn_;
+  TBranch *evt_corrMETPhi_dn_branch;
+  bool     evt_corrMETPhi_dn_isLoaded;
   float    evt_pfsumet_;
   TBranch *evt_pfsumet_branch;
   bool     evt_pfsumet_isLoaded;
@@ -115,6 +127,9 @@ class LeptonTree {
   vector<float> *jets_undoJEC_;
   TBranch *jets_undoJEC_branch;
   bool     jets_undoJEC_isLoaded;
+  vector<float> *jets_unc_;
+  TBranch *jets_unc_branch;
+  bool     jets_unc_isLoaded;
   TString *sample_;
   TBranch *sample_branch;
   bool     sample_isLoaded;
@@ -448,6 +463,9 @@ class LeptonTree {
   int      HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_;
   TBranch *HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_branch;
   bool     HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30_isLoaded;
+  vector<float> *evt_wgt_vars_;
+  TBranch *evt_wgt_vars_branch;
+  bool     evt_wgt_vars_isLoaded;
 public: 
 void Init(TTree *tree);
 void GetEntry(unsigned int idx); 
@@ -458,6 +476,10 @@ void LoadAllBranches();
   const float &evt_trackmetPhi();
   const float &evt_corrMET();
   const float &evt_corrMETPhi();
+  const float &evt_corrMET_up();
+  const float &evt_corrMETPhi_up();
+  const float &evt_corrMET_dn();
+  const float &evt_corrMETPhi_dn();
   const float &evt_pfsumet();
   const float &evt_pfmetSig();
   const int &evt_event();
@@ -483,6 +505,7 @@ void LoadAllBranches();
   const vector<float> &jets_disc();
   const vector<float> &jets_area();
   const vector<float> &jets_undoJEC();
+  const vector<float> &jets_unc();
   const TString &sample();
   const int &nFOs_SS();
   const int &nFOs_VVV();
@@ -594,6 +617,7 @@ void LoadAllBranches();
   const int &HLT_Ele17_CaloIdM_TrackIdM_PFJet30();
   const int &HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30();
   const int &HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30();
+  const vector<float> &evt_wgt_vars();
 
   static void progress(int nEventsTotal, int nEventsChain);
 };
@@ -602,13 +626,17 @@ void LoadAllBranches();
 extern LeptonTree lepton_tree;
 #endif
 
-namespace LeptonTreeNamespace {
+namespace LeptonTreeNameSpace {
   const float &evt_pfmet();
   const float &evt_pfmetPhi();
   const float &evt_trackmet();
   const float &evt_trackmetPhi();
   const float &evt_corrMET();
   const float &evt_corrMETPhi();
+  const float &evt_corrMET_up();
+  const float &evt_corrMETPhi_up();
+  const float &evt_corrMET_dn();
+  const float &evt_corrMETPhi_dn();
   const float &evt_pfsumet();
   const float &evt_pfmetSig();
   const int &evt_event();
@@ -634,6 +662,7 @@ namespace LeptonTreeNamespace {
   const vector<float> &jets_disc();
   const vector<float> &jets_area();
   const vector<float> &jets_undoJEC();
+  const vector<float> &jets_unc();
   const TString &sample();
   const int &nFOs_SS();
   const int &nFOs_VVV();
@@ -745,5 +774,6 @@ namespace LeptonTreeNamespace {
   const int &HLT_Ele17_CaloIdM_TrackIdM_PFJet30();
   const int &HLT_Ele8_CaloIdL_TrackIdL_IsoVL_PFJet30();
   const int &HLT_Ele17_CaloIdL_TrackIdL_IsoVL_PFJet30();
+  const vector<float> &evt_wgt_vars();
 }
 #endif

@@ -9,7 +9,7 @@
 #include "../CORE/Tools/dorky/dorky.cc"
 
 using namespace std;
-using namespace LeptonTreeNamespace;
+using namespace LeptonTreeNameSpace;
 
 struct Lepton
 {
@@ -22,12 +22,21 @@ struct Lepton
     int id;
     int nFOs_VVV;
     int njets40;
+    int njets40_up;
+    int njets40_dn;
     int prescale;
     bool pass_trig;
     float weight;
+    std::vector<float> wgt_syst;
     float evt_met;
     float evt_metPhi;
+    float evt_met_up;
+    float evt_metPhi_up;
+    float evt_met_dn;
+    float evt_metPhi_dn;
     float evt_mt;
+    float evt_mt_up;
+    float evt_mt_dn;
     bool passId;
     bool passFO;
     float coneptcorr;
@@ -69,7 +78,8 @@ float mvacut( float A, float B, float C, float pt_ );
 void fill( TasUtil::AutoHist& hists, TString suffix, float& evt_mt, float& evt_met, float& weight);
 void fillFakeRateHistograms( TasUtil::AutoHist& hists, TString label, float& evt_met, float& evt_mt, float& weight );
 void fillEventLevelHistograms( std::vector<Lepton>& leptons, TasUtil::AutoHist& hists );
+void fillEventLevelHistogramsSyst( std::vector<Lepton> leptons, TasUtil::AutoHist& hists, int njets, float evt_met, float evt_metPhi, float evt_mt, int iwgt, TString);
 
-double nvtxRewgtMu( int nvtx );
-double nvtxRewgtEl( int nvtx );
+double nvtxRewgtMu( Lepton& );
+double nvtxRewgtEl( Lepton& );
 double nvtxRewgt( int nvtx );
